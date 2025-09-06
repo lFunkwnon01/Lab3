@@ -108,6 +108,34 @@ class DataFile:
         self.filename = filename
         self.filename = filename + '_idx'
 
+    def search(self, id_venta: int):
+        with open(self.filename, 'rb') as f:
+            while True:
+                data = f.read(Page.SIZE_OF_PAGE)
+                if not data:
+                    break
+                page = Page.unpack(data)
+                for record in page.records:
+                    if record.id_venta == id_venta:
+                        return record
+        return None
+
+    def delete(self, id_venta: int):
+        with open(self.filename, 'r+b') as f:
+            while True:
+                pos = f.tell()
+                data = f.read(Page.SIZE_OF_PAGE)
+                if not data:
+                    break
+                page = Page.unpack(data)
+                for i, record in enumerate(page.records):
+                    if record.id_venta == id_venta:
+                        del page.records[i]
+                        f.seek(pos)
+                        f.write(page.pack())
+                        return True
+        return False
+
     def add(self, record: Record):
         # 1 si el archivo no existe o vacio, lo crea con una page y el registro
         # 2 si no recuperamos la ultima page
@@ -171,7 +199,44 @@ datafile.add(Record(1, 'Cafetera Inteligente', 31, 1751.2, '04/06/2024'))
 datafile.add(Record(2, 'Purificador de Aire', 42, 1938.49, '09/11/2024'))
 datafile.add(Record(3, 'Raspberry Pi', 34, 1257.34, '22/11/2024'))
 datafile.add(Record(4, 'olaqhace', 37, 156.34, '15/10/2024'))
+datafile.add(Record(5, 'Laptop', 10, 1500.0, '01/01/2023'))
+datafile.add(Record(6, 'Smartphone', 20, 800.0, '02/02/2023'))
+datafile.add(Record(7, 'Tablet', 15, 600.0, '03/03/2023'))
+datafile.add(Record(8, 'Monitor', 5, 300.0, '04/04/2023'))
+datafile.add(Record(9, 'XD', 5, 300.0, '04/04/2023'))
+datafile.add(Record(10, 'BASTA', 5, 300.0, '04/04/2023'))
 
 datafile.scanAll()
-indexfile = IndexFile('indexfile.idx')
+print('------------------------------------------------------------------------------------------------')
+record = datafile.search(6)
+if record:
+    print(f'Registro encontrado: ID: {record.id_venta}, Producto: {record.nombre_producto}')
+else:
+    print('Registro no encontrado.')
+
+record = datafile.search(99)
+if record:
+    print(f'Registro encontrado: ID: {record.id_venta}, Producto: {record.nombre_producto}')
+else:
+    print('Registro no encontrado.')
+
+datafile.delete(7)
+datafile.delete(8)
+datafile.delete(9)
+datafile.delete(10)
+datafile.scanAll()
+print('------------------------------------------------------------------------------------------------')
+datafile.add(Record(7, 'Smartphone', 20, 800.0, '02/02/2023'))
+datafile.add(Record(8, 'Tablet', 15, 600.0, '03/03/2023'))
+datafile.add(Record(9, 'Monitor', 5, 300.0, '04/04/2023'))
+datafile.scanAll()
+print('------------------------------------------------------------------------------------------------')
+indexfile = IndexFile('test_indexfile.idx')
 indexfile.build_index(datafile)
+
+# respuesta a la pregunta de eliminación:
+'''
+La desición del grupo seria marcar la página vacía para que cuando
+alguna otra página se llene y necesite una nueva página, use dicha página vacía.
+
+'''
