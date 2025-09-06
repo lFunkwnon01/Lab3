@@ -4,26 +4,37 @@ import os
 BLOCK_FACTOR = 3
 
 class Record:
-    FORMAT = '20s20si'
+    FORMAT = 'i30sif10s'
     SIZE_OF_RECORD = struct.calcsize(FORMAT)
 
-    def __init__(self, nombre: str, apellido: str, ciclo: int):
-        self.nombre = nombre
-        self.apellido = apellido
-        self.ciclo = ciclo
+    def __init__(self, id_venta: int, nombre_producto: str, cantidad_vendida: int, precio_unitario: float,
+                 fecha_venta: str):
+        self.id_venta = id_venta
+        self.nombre_producto = nombre_producto
+        self.cantidad_vendida = cantidad_vendida
+        self.precio_unitario = precio_unitario
+        self.fecha_venta = fecha_venta
 
     def pack(self):
-        return struct.pack(self.FORMAT, 
-                           self.nombre[:20].encode(), 
-                           self.apellido[:20].encode(), 
-                           self.ciclo)
+        return struct.pack(
+            self.FORMAT,
+            self.id_venta,
+            self.nombre_producto[:30].encode(),
+            self.cantidad_vendida,
+            self.precio_unitario,
+            self.fecha_venta[:10].encode()
+        )
     
     @staticmethod
     def unpack(data):
-        nombre, apellido, ciclo = struct.unpack(Record.FORMAT, data)
-        return Record(nombre.decode().rstrip(), 
-                      apellido.decode().rstrip(), 
-                      ciclo)
+        id_venta, nombre_producto, cantidad_vendida, precio_unitario, fecha_venta = struct.unpack(Record.FORMAT, data)
+        return Record(
+            id_venta,
+            nombre_producto.decode().rstrip(),
+            cantidad_vendida,
+            precio_unitario,
+            fecha_venta.decode().rstrip()
+        )
     
 class Page:
     HEADER_FORMAT = 'ii' # size, next_page
@@ -61,6 +72,36 @@ class Page:
             offset += Record.SIZE_OF_RECORD
 
         return Page(records, next_page)
+
+class IndexFile:
+    def __init__(self, filename: str):
+        self.filename = filename
+
+    def build_index(self, datafile: 'DataFile'):
+        with open(datafile.filename, 'rb') as df, open(self.filename, 'wb') as idxf:
+            page_number = 0
+            while True:
+                data = df.read(Page.SIZE_OF_PAGE)
+                if not data:
+                    break
+                page = Page.unpack(data)
+                if page.records:
+                    first_record = page.records[0]
+                    key = first_record.id_venta
+                    idxf.write(struct.pack('i', key))
+                page_number += 1
+
+    def search(self, id_venta: int):
+        with open(self.filename, 'rb') as idxf:
+            while True:
+                data = idxf.read(24)
+                if not data:
+                    break
+                page_id = struct.unpack('i', data) [0]
+                if page_id >= id_venta:
+                    return page_id
+        return -1
+
 
 class DataFile:
     def __init__(self, filename: str):
@@ -118,23 +159,20 @@ class DataFile:
                 print(f'Page {i+1}:')
                 for record in page.records:
                     record_data = record.unpack(record.pack())
-                    print(f'{record_data.nombre}, {record_data.apellido}, {record_data.ciclo}')
+                    print(f'ID: {record.id_venta}, Producto: {record.nombre_producto}, '
+                          f'Cantidad: {record.cantidad_vendida}, Precio: {record.precio_unitario}, '
+                          f'Fecha: {record.fecha_venta}')
+
 
 
 # obtener los indices 
 # buscar un registro por su clave
  
+datafile = DataFile('sales_dataset_unsorted.csv')
+datafile.add(Record(1, 'Cafetera Inteligente', 31, 1751.2, '04/06/2024'))
+datafile.add(Record(2, 'Purificador de Aire', 42, 1938.49, '09/11/2024'))
+datafile.add(Record(3, 'Raspberry Pi', 34, 1257.34, '22/11/2024'))
 
-
-
-class IndexFile:
-    pass
-
-
-
-dataf = DataFile('datafile.dat')
-dataf.add(Record('Ana', 'Vera', 9))
-dataf.add(Record('Bety', 'Alzamora', 9))
-dataf.add(Record('Federico', 'Ninquispe', 9))
-dataf.add(Record('James', 'Quispe', 9))
-dataf.scanAll()
+datafile.scanAll()
+indexfile = IndexFile('indexfile.idx')
+indexfile.build_index(datafile)
