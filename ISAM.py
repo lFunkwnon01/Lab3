@@ -137,9 +137,7 @@ class DataFile:
                 f.seek(0, 2)
                 f.write(new_page.pack())
                 # desbordamiento / overflow 
-                page.next_page = (os.path.getsize(self.filename) // Page.SIZE_OF_PAGE) - 1
-                f.seek(-Page.SIZE_OF_PAGE, 1)
-                f.write(page.pack())
+
 
     def scanAll(self):
         # imprimir todos los registros y el numero de page
@@ -172,6 +170,7 @@ datafile = DataFile('sales_dataset_unsorted.csv')
 datafile.add(Record(1, 'Cafetera Inteligente', 31, 1751.2, '04/06/2024'))
 datafile.add(Record(2, 'Purificador de Aire', 42, 1938.49, '09/11/2024'))
 datafile.add(Record(3, 'Raspberry Pi', 34, 1257.34, '22/11/2024'))
+datafile.add(Record(4, 'olaqhace', 37, 156.34, '15/10/2024'))
 
 datafile.scanAll()
 indexfile = IndexFile('indexfile.idx')
