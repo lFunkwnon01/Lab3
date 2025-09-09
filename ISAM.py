@@ -1,7 +1,7 @@
 import struct
 import os
 
-BLOCK_FACTOR = 3
+BLOCK_FACTOR = 5
 
 class Record:
     FORMAT = 'i30sif10s'
@@ -106,7 +106,9 @@ class IndexFile:
 class DataFile:
     def __init__(self, filename: str):
         self.filename = filename
-        self.filename = filename + '_idx'
+        if not os.path.exists(filename):
+            with open(filename, 'wb') as f:
+                pass
 
     def search(self, id_venta: int):
         with open(self.filename, 'rb') as f:
@@ -143,29 +145,38 @@ class DataFile:
         # 2.2 si esta llena, crear una nueva page al final con un solo record
         
         # 1
-        if not os.path.exists(self.filename):
-            with open(self.filename, 'wb') as f:
-                page = Page([record])
-                f.write(page.pack())
-            return
-        
-        # 2 
         with open(self.filename, 'r+b') as f:
-            f.seek(-Page.SIZE_OF_PAGE, 2)
-            page_data = f.read(Page.SIZE_OF_PAGE)
-            page = Page.unpack(page_data)
-            # 2.1
-            if len(page.records) < BLOCK_FACTOR:
-                page.records.append(record)
-                f.seek(-Page.SIZE_OF_PAGE, 1)
-                f.write(page.pack())
-            else:
-                # 2.2
-                new_page = Page([record])
-                f.seek(0, 2)
-                f.write(new_page.pack())
-                # desbordamiento / overflow 
+            f.seek(0)
+            while True:
+                pos = f.tell()
+                data = f.read(Page.SIZE_OF_PAGE)
+                if not data:
+                    break
+                page = Page.unpack(data)
+                if len(page.records) < BLOCK_FACTOR:
+                    page.records.append(record)
+                    f.seek(pos)
+                    f.write(page.pack())
+                    return
 
+            f.seek(0, 2)
+            file_size = f.tell()
+
+            if file_size >= Page.SIZE_OF_PAGE:
+                f.seek(-Page.SIZE_OF_PAGE, 2)
+                page_data = f.read(Page.SIZE_OF_PAGE)
+                page = Page.unpack(page_data)
+
+                if len(page.records) < BLOCK_FACTOR:
+                    page.records.append(record)
+                    f.seek(-Page.SIZE_OF_PAGE, 1)
+                    f.write(page.pack())
+                    return
+
+            new_page = Page([record])
+            f.seek(0, 2)
+            f.write(new_page.pack())
+                # desbordamiento / overflow 
 
     def scanAll(self):
         # imprimir todos los registros y el numero de page
@@ -174,27 +185,30 @@ class DataFile:
         # rec 2
         # rec 3
         with open(self.filename, 'rb') as f:
-            f.seek(0,2)
-            num_pages = f.tell() // Page.SIZE_OF_PAGE
-            f.seek(0)
-
-            for i in range(num_pages):
+            f.seek(0, 2)
+            numPages = f.tell() // Page.SIZE_OF_PAGE
+            f.seek(0, 0)
+            for i in range(numPages):
                 page_data = f.read(Page.SIZE_OF_PAGE)
                 page = Page.unpack(page_data)
-                
-                print(f'Page {i+1}:')
-                for record in page.records:
-                    record_data = record.unpack(record.pack())
-                    print(f'ID: {record.id_venta}, Producto: {record.nombre_producto}, '
-                          f'Cantidad: {record.cantidad_vendida}, Precio: {record.precio_unitario}, '
-                          f'Fecha: {record.fecha_venta}')
-
-
+                print(f"-- Page {i} (size={len(page.records)}, next={page.next_page})")
+                for rec in page.records:
+                    print("   ", rec)
 
 # obtener los indices 
 # buscar un registro por su clave
- 
-datafile = DataFile('sales_dataset_unsorted.csv')
+
+if __name__ == "__main__":
+    DATA_PATH = "sales.dat"
+
+    df = DataFile(DATA_PATH)
+
+    print("Contenido inicial del archivo (paginado):")
+    df.scanAll()
+
+
+
+'''
 datafile.add(Record(1, 'Cafetera Inteligente', 31, 1751.2, '04/06/2024'))
 datafile.add(Record(2, 'Purificador de Aire', 42, 1938.49, '09/11/2024'))
 datafile.add(Record(3, 'Raspberry Pi', 34, 1257.34, '22/11/2024'))
@@ -229,13 +243,14 @@ print('-------------------------------------------------------------------------
 datafile.add(Record(7, 'Smartphone', 20, 800.0, '02/02/2023'))
 datafile.add(Record(8, 'Tablet', 15, 600.0, '03/03/2023'))
 datafile.add(Record(9, 'Monitor', 5, 300.0, '04/04/2023'))
+datafile.add(Record(10, 'BASTA', 5, 300.0, '04/04/2023'))
 datafile.scanAll()
 print('------------------------------------------------------------------------------------------------')
 indexfile = IndexFile('test_indexfile.idx')
 indexfile.build_index(datafile)
 
 # respuesta a la pregunta de eliminación:
-'''
+
 La desición del grupo seria marcar la página vacía para que cuando
 alguna otra página se llene y necesite una nueva página, use dicha página vacía.
 
