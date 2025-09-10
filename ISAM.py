@@ -1,7 +1,7 @@
 import struct
 import os
 
-BLOCK_FACTOR = 5
+BLOCK_FACTOR = 3
 
 class Record:
     FORMAT = 'i30sif10s'
@@ -35,7 +35,10 @@ class Record:
             precio_unitario,
             fecha_venta.decode().rstrip()
         )
-    
+
+    def __repr__(self):
+        return f"Record(id={self.id_venta}, nombre='{self.nombre_producto}', cantidad={self.cantidad_vendida}, precio={self.precio_unitario}, fecha='{self.fecha_venta}')"
+
 class Page:
     HEADER_FORMAT = 'ii' # size, next_page
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
@@ -74,6 +77,9 @@ class Page:
         return Page(records, next_page)
 
 class IndexFile:
+    ENTRY_FORMAT = "ii"  # (clave, numero de pagina)
+    ENTRY_SIZE = struct.calcsize(ENTRY_FORMAT)
+
     def __init__(self, filename: str):
         self.filename = filename
 
@@ -88,19 +94,32 @@ class IndexFile:
                 if page.records:
                     first_record = page.records[0]
                     key = first_record.id_venta
-                    idxf.write(struct.pack('i', key))
+                    idxf.write(struct.pack(self.ENTRY_FORMAT, key, page_number))
                 page_number += 1
+
+    def print_index(self):
+        with open(self.filename, 'rb') as idxf:
+            print("\n--- ÍNDICE ---")
+            entry_num = 0
+            while True:
+                data = idxf.read(self.ENTRY_SIZE)
+                if not data:
+                    break
+                key, page_number = struct.unpack(self.ENTRY_FORMAT, data)
+                print(f"Entrada {entry_num}: clave={key}, página={page_number}")
+                entry_num += 1
 
     def search(self, id_venta: int):
         with open(self.filename, 'rb') as idxf:
             while True:
-                data = idxf.read(24)
+                data = idxf.read(self.ENTRY_SIZE)
                 if not data:
                     break
-                page_id = struct.unpack('i', data) [0]
-                if page_id >= id_venta:
-                    return page_id
+                key, page_number = struct.unpack(self.ENTRY_FORMAT, data)
+                if key >= id_venta:
+                    return page_number
         return -1
+
 
 
 class DataFile:
@@ -132,11 +151,12 @@ class DataFile:
                 page = Page.unpack(data)
                 for i, record in enumerate(page.records):
                     if record.id_venta == id_venta:
+                        deleted_record = page.records[i]
                         del page.records[i]
                         f.seek(pos)
                         f.write(page.pack())
-                        return True
-        return False
+                        return deleted_record
+        return None
 
     def add(self, record: Record):
         # 1 si el archivo no existe o vacio, lo crea con una page y el registro
@@ -198,13 +218,7 @@ class DataFile:
 # obtener los indices 
 # buscar un registro por su clave
 
-if __name__ == "__main__":
-    DATA_PATH = "sales.dat"
 
-    df = DataFile(DATA_PATH)
-
-    print("Contenido inicial del archivo (paginado):")
-    df.scanAll()
 
 
 
