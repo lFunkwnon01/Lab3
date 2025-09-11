@@ -44,6 +44,7 @@ def initialize_datafile():
     if not os.path.exists(DATA_FILENAME) or os.path.getsize(DATA_FILENAME) == 0:
         print("Inicializando base de datos desde CSV...")
         load_csv_to_datafile(CSV_FILENAME, df)
+        df.reorganize()
     return df
 
 def menu():
@@ -77,6 +78,8 @@ def menu():
             fecha = input("Fecha de venta (YYYY-MM-DD): ")
             rec = Record(id_venta, nombre, cantidad, precio, fecha)
             df.add(rec)
+            df.reorganize()
+
             print("Registro insertado.")
         elif op == "5":
             break

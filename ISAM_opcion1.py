@@ -216,7 +216,7 @@ class DataFile:
                       f'Cantidad: {record.cantidad_vendida}, Precio: {record.precio_unitario}, '
                       f'Fecha: {record.fecha_venta}')
 
-# Ejemplo de uso
+'''
 if __name__ == '__main__':
     # Limpiar archivo de datos antes de insertar para evitar duplicados
     data_filename = 'datafile_split.dat'
@@ -244,3 +244,5 @@ if __name__ == '__main__':
     datafile.scanAll()
     print('--- Índice (clave, num_pagina) después de eliminar ---')
     print(index.entries)
+
+'''

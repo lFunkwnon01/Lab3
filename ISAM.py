@@ -166,37 +166,47 @@ class DataFile:
         
         # 1
         with open(self.filename, 'r+b') as f:
-            f.seek(0)
+            f.seek(0, 2)
+            if f.tell() == 0:
+                new_page = Page([record])
+                f.write(new_page.pack())
+                return
+
+            f.seek(-Page.SIZE_OF_PAGE, 2)
+            pos = f.tell()
+            page_data = f.read(Page.SIZE_OF_PAGE)
+            page = Page.unpack(page_data)
+
+            if len(page.records) < BLOCK_FACTOR:
+                page.records.append(record)
+                page.records.sort(key=lambda r: r.id_venta)
+                f.seek(pos)
+                f.write(page.pack())
+            else:
+                new_page = Page([record])
+                f.seek(0, 2)
+                f.write(new_page.pack())
+                # desbordamiento / overflow
+    def reorganize(self):
+        all_records = []
+        with open(self.filename, "rb") as f:
             while True:
-                pos = f.tell()
                 data = f.read(Page.SIZE_OF_PAGE)
                 if not data:
                     break
                 page = Page.unpack(data)
-                if len(page.records) < BLOCK_FACTOR:
-                    page.records.append(record)
-                    f.seek(pos)
-                    f.write(page.pack())
-                    return
+                all_records.extend(page.records)
 
-            f.seek(0, 2)
-            file_size = f.tell()
+        all_records.sort(key=lambda r: r.id_venta)
 
-            if file_size >= Page.SIZE_OF_PAGE:
-                f.seek(-Page.SIZE_OF_PAGE, 2)
-                page_data = f.read(Page.SIZE_OF_PAGE)
-                page = Page.unpack(page_data)
+        with open(self.filename, "wb") as f:
+            i = 0
+            while i < len(all_records):
+                page_records = all_records[i:i+BLOCK_FACTOR]
+                page = Page(page_records)
+                f.write(page.pack())
+                i += BLOCK_FACTOR
 
-                if len(page.records) < BLOCK_FACTOR:
-                    page.records.append(record)
-                    f.seek(-Page.SIZE_OF_PAGE, 1)
-                    f.write(page.pack())
-                    return
-
-            new_page = Page([record])
-            f.seek(0, 2)
-            f.write(new_page.pack())
-                # desbordamiento / overflow 
 
     def scanAll(self):
         # imprimir todos los registros y el numero de page
@@ -208,6 +218,7 @@ class DataFile:
             f.seek(0, 2)
             numPages = f.tell() // Page.SIZE_OF_PAGE
             f.seek(0, 0)
+
             for i in range(numPages):
                 page_data = f.read(Page.SIZE_OF_PAGE)
                 page = Page.unpack(page_data)
